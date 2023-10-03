@@ -9,4 +9,3 @@ data-raw/*gz
 data-raw/*txt
 datasets/*
 *pdf
-*.Rproj
