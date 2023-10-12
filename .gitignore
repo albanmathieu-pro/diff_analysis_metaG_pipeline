@@ -1,3 +1,6 @@
+/renv.lock
+/renv/
+.Rprofile
 .Rproj.user
 .Rhistory
 .RData
@@ -7,5 +10,5 @@ data-raw/*rds
 data-raw/*RData
 data-raw/*gz
 data-raw/*txt
-datasets/*
+datasets/
 *pdf
