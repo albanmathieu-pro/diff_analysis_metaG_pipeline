@@ -303,7 +303,7 @@ produce_single_de_batch <- function(current_de_info, txi, design, dds, de) {
         dds <- deseq2_analysis(txi = txi,
                                design = design,
                                formula = formula,
-                               filter = cdi$formula,
+                               filter = cdi$filter,
                                count_matrix = count_matrix)
     }
 
