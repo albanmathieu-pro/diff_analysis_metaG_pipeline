@@ -183,7 +183,7 @@ produce_volcano <- function(de_res, fc_threshold = 3, p_threshold = 0.05,
         p <- p + ggplot2::ggtitle(title)
     }
     p <- p + ggplot2::theme_minimal() +
-        ggplot2::ylab(y_axis)
+        ggplot2::ylab(paste0("-log10(", y_axis, ")"))
 
     if (isTRUE(graph)) {
         print(p)
