@@ -1,5 +1,5 @@
 #Loading packages
-library(tidyverse)
+library(readr)
 library(gprofiler2)
 library(multienrichjam)
 library(clusterProfiler)
@@ -46,11 +46,12 @@ get_demo_de_res <- function(){
 #'
 #' @examples
 #' de_res <- get_demo_de_res()
-#' gp <- gprofiler2_analysis(de_res)
+#' enr <- gprofiler2_analysis(de_res)
 #'
 #' @importFrom gprofiler2 gost
 #' @importFrom clusterProfiler merge_result
 #' @importFrom clusterProfiler dotplot
+#' @importFrom methods allNames
 #'
 #' @export
 
@@ -120,6 +121,7 @@ gprofiler2_analysis <- function(de_res, p_threshold = 0.05, fc_threshold = 1.5, 
   }
   res <- map(de_res, ~ functional_enrichment(.x))
   final_res <- list(gp = map(res, ~ .x$gp), cp = map(res, ~ .x$cp))
+  final_res$cp <- map(final_res$cp, ~ list(enrichResult = .x, df = .x@result))
   return(final_res)
 }
 

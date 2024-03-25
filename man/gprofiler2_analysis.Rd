@@ -37,6 +37,6 @@ Produces a gene profile from DESeq2 results, converts the result for clusterProf
 }
 \examples{
 de_res <- get_demo_de_res()
-gp <- gprofiler2_analysis(de_res)
+enr <- gprofiler2_analysis(de_res)
 
 }
