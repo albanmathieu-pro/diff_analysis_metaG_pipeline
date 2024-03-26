@@ -1,7 +1,5 @@
-#Loading of packages
-library(rnaseq)
-
-de_res <- get_demo_de_res()
+#Creating a list of data.frames
+de_res <- get_demo_de_res(2)
 enr <- gprofiler2_analysis(de_res)
 
 is_valid_gp <- function(enr){
@@ -53,7 +51,10 @@ is_valid_gp <- function(enr){
 }
 
 test_that("gprofiler2_analysis works with valid data", {
-  is_valid_gp(enr$gp$de_res)
+  is_valid_gp(enr$gp$df1)
+})
+test_that("gprofiler2_analysis works with valid data", {
+  is_valid_gp(enr$gp$df2)
 })
 
 is_valid_cp <- function(enr){
@@ -114,5 +115,8 @@ is_valid_cp <- function(enr){
 }
 
 test_that("gprofiler2_analysis works with valid data", {
-  is_valid_cp(enr$cp$de_res)
+  is_valid_cp(enr$cp$df1)
+})
+test_that("gprofiler2_analysis works with valid data", {
+  is_valid_cp(enr$cp$df2)
 })

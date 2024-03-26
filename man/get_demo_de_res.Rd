@@ -4,7 +4,7 @@
 \alias{get_demo_de_res}
 \title{Imports a standard resulting data.frame from DESeq2}
 \usage{
-get_demo_de_res()
+get_demo_de_res(nombre = 1)
 }
 \value{
 the object returned is a .csv file that countains a data.frame with :

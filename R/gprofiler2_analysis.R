@@ -1,26 +1,37 @@
-#Loading packages
-library(readr)
-library(gprofiler2)
-library(multienrichjam)
-library(clusterProfiler)
-
-
-
-
 #' Imports a standard resulting data.frame from DESeq2
 #'
-#' @return the object returned is a .csv file that countains a data.frame with :
+#' @param nombre an \code{integer} that can take the value 1 or 2 specifying if you want to
+#' import only one \code{data.frame} or a \code{list} of two data.frames
+#' Default: 1
+#'
+#' @return if no argument given the object returned is a .csv file that contains a \code{data.frame} named df1 with:
+#' df1 specifications:
 #' 25 rows with a padj < 0.05 (significant) & a abs(log2FoldChange) > log2(1.5)
 #' 25 rows with a padj < 0.05 (significant) & a abs(log2FoldChange) < log2(1.5)
 #' 25 rows with a padj > 0.05 (not significant) & a abs(log2FolChcange) > log2(1.5)
 #' 25 rows with a padj > 0.05 (not significant) & a abs(log2FoldChange) < log2(1.5)
+#' if argument given (number=2) the object returned is a \code{list} of two .csv files that contain a \code{data.frame} named df1 and df2.
+#' df2 specifications:
+#' 50 rows with a padj < 0.05 (significant) & a abs(log2FoldChange) > log2(2)
+#' 50 rows with a padj < 0.05 (significant) & a abs(log2FoldChange) < log2(2)
+#' 50 rows with a padj > 0.05 (not significant) & a abs(log2FolChcange) > log2(2)
+#' 50 rows with a padj > 0.05 (not significant) & a abs(log2FoldChange) < log2(2)
+#'
+#' @examples
+#' de_res <- get_demo_de_res()
+#' de_res <- get_demo_de_res(2)
 #'
 #' @importFrom readr read_csv
 #'
 #' @export
 
-get_demo_de_res <- function(){
-  read_csv("inst/extdata/demo_de_res.csv")
+get_demo_de_res <- function(number=1){
+  stopifnot(nombre %in% c(1, 2))
+  if(nombre  == 2){
+    return(list(df1=read_csv(system.file("extdata/demo_de_res.csv", package = "rnaseq")), df2=read_csv(system.file("extdata/demo_de_res2.csv", package = "rnaseq"))))
+  } else {
+    return(df1=read_csv(system.file("extdata/demo_de_res.csv", package = "rnaseq")))
+  }
 }
 
 
@@ -41,8 +52,12 @@ get_demo_de_res <- function(){
 #' and the family name, e.g human - hsapiens.
 #' Default : "hsapiens"
 #'
-#' @return a list of two lists. list$gp is the \code{list} returned by \code{gprofiler::gost}.
+#' @return a list of two lists. list$gp is the \code{list} returned by \code{gprofiler::gost} that contains
+#' either one or many gene profiles(gp) objects depending on the parameter de_res.
 #' list$cp is the \code{list} returned by the \code{gprofiler2_convert} function.
+#' the list$cp can contain one or many clusterProfiler gene profiles (cp) depending on the parameter de_res.
+#' Each cp has one enrichResult object returned by \code{multienrichjam::enrichDF2enrichResult} and one \code{data.frame}
+#' df generated from the result \code{list} in the enrichResult object
 #'
 #' @examples
 #' de_res <- get_demo_de_res()
@@ -51,7 +66,8 @@ get_demo_de_res <- function(){
 #' @importFrom gprofiler2 gost
 #' @importFrom clusterProfiler merge_result
 #' @importFrom clusterProfiler dotplot
-#' @importFrom methods allNames
+#' @importFrom purrr map
+#' @importFrom purrr walk
 #'
 #' @export
 
@@ -168,7 +184,7 @@ gprofiler2_convert <- function(gp){
   stopifnot(is.list(gp$meta))
 
   #(1.0) Bloc that converts the result from gprofiler2::gost in a compatible object for clusterProfiler visualization
-  cp <- enrichDF2enrichResult(enrichDF = gp$result, keyColname = "term_id",
+  cp <- multienrichjam::enrichDF2enrichResult(enrichDF = gp$result, keyColname = "term_id",
                               geneColname = "intersection", pvalueColname = "p_value",
                               descriptionColname = "term_name", pvalueCutoff = 0.05, geneRatioColname = "GeneRatio")
   return(cp)
