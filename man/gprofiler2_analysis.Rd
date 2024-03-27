@@ -29,8 +29,12 @@ and the family name, e.g human - hsapiens.
 Default : "hsapiens"}
 }
 \value{
-a list of two lists. list$gp is the \code{list} returned by \code{gprofiler::gost}.
+a list of two lists. list$gp is the \code{list} returned by \code{gprofiler::gost} that contains
+either one or many gene profiles(gp) objects depending on the parameter de_res.
 list$cp is the \code{list} returned by the \code{gprofiler2_convert} function.
+the list$cp can contain one or many clusterProfiler gene profiles (cp) depending on the parameter de_res.
+Each cp has one enrichResult object returned by \code{multienrichjam::enrichDF2enrichResult} and one \code{data.frame}
+df generated from the result \code{list} in the enrichResult object
 }
 \description{
 Produces a gene profile from DESeq2 results, converts the result for clusterProfiler visualization

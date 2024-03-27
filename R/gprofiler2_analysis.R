@@ -26,8 +26,8 @@
 #' @export
 
 get_demo_de_res <- function(number=1){
-  stopifnot(nombre %in% c(1, 2))
-  if(nombre  == 2){
+  stopifnot(number %in% c(1, 2))
+  if(number  == 2){
     return(list(df1=read_csv(system.file("extdata/demo_de_res.csv", package = "rnaseq")), df2=read_csv(system.file("extdata/demo_de_res2.csv", package = "rnaseq"))))
   } else {
     return(df1=read_csv(system.file("extdata/demo_de_res.csv", package = "rnaseq")))
