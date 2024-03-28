@@ -36,8 +36,8 @@ Imports:
     clusterProfiler,
     multienrichjam,
     SummarizedExperiment,
-    jvamisc
-Remotes: JVAdams/jvamisc
+    multienrichjam
+Remotes: jmw86069/multienrichjam
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
