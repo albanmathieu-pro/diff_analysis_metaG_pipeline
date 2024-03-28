@@ -59,8 +59,11 @@ test_that("gprofiler2_analysis works with valid data", {
 
 is_valid_cp <- function(enr){
 
+  if (!is.null(enr$enrichResult)){
+    expect_true(class(enr$enrichResult) == "enrichResult")
+  }
+
   #Test expected type of objects in cp
-  expect_true(class(enr$enrichResult) == "enrichResult")
   expect_true(is.list(enr$df))
   expect_true(is.list(enr$df$parents))
 

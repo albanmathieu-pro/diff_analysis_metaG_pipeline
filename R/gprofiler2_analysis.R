@@ -68,6 +68,7 @@ get_demo_de_res <- function(number=1){
 #' @importFrom clusterProfiler dotplot
 #' @importFrom purrr map
 #' @importFrom purrr walk
+#' @importFrom tidyr tibble
 #'
 #' @export
 
@@ -127,17 +128,59 @@ gprofiler2_analysis <- function(de_res, p_threshold = 0.05, fc_threshold = 1.5, 
                            evcodes = TRUE,
                            user_threshold = p_threshold,
                            sources = c("GO:BP", "REAC", "KEGG", "WP"))
+    if(is.null(gp)){
+      gp <- list(result=as.data.frame(tibble(query=character(),
+                                             significant=logical(),
+                                             p_value=double(),
+                                             term_size=integer(),
+                                             query_size=integer(),
+                                             intersection_size=integer(),
+                                             precision=double(),
+                                             recall=double(),
+                                             term_id=character(),
+                                             source=character(),
+                                             term_name=character(),
+                                             effective_domain_size=integer(),
+                                             source_order=integer(),
+                                             parents=list(),
+                                             evidence_codes=character(),
+                                             intersection=character(),
+                                             GeneRatio=character())), meta=list())
 
-    gp$result$GeneRatio = paste0(gp$result$intersection_size, "/", gp$result$query_size)
+      cp <- list(enrichResult = NULL, df=as.data.frame(tibble(ID=character(),
+                                                              query=character(),
+                                                              significant=logical(),
+                                                              pvalue=double(),
+                                                              term_size=integer(),
+                                                              query_size=integer(),
+                                                              intersection_size=integer(),
+                                                              precision=double(),
+                                                              recall=double(),
+                                                              source=character(),
+                                                              Description=character(),
+                                                              effective_domain_size=integer(),
+                                                              source_order=integer(),
+                                                              parents=list(),
+                                                              evidence_codes=character(),
+                                                              geneID=character(),
+                                                              GeneRatio=character(),
+                                                              p.adjust=double(),
+                                                              Count=integer(),
+                                                              setSize=double())))
 
-    cp <- gprofiler2_convert(gp)
+    } else{
+      gp$result$GeneRatio = paste0(gp$result$intersection_size, "/", gp$result$query_size)
 
+      cp <- list(enrichResult=gprofiler2_convert(gp))
+
+      cp$df = cp$enrichResult@result
+
+    }
     return(list(gp=gp, cp=cp))
 
   }
   res <- map(de_res, ~ functional_enrichment(.x))
   final_res <- list(gp = map(res, ~ .x$gp), cp = map(res, ~ .x$cp))
-  final_res$cp <- map(final_res$cp, ~ list(enrichResult = .x, df = .x@result))
   return(final_res)
 }
 
