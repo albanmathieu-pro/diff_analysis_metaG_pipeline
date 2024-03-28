@@ -102,7 +102,7 @@ gprofiler2_analysis <- function(de_res, p_threshold = 0.05, fc_threshold = 1.5, 
 
   ##fc_threshold
   stopifnot(is.numeric(fc_threshold))
-  stopifnot(fc_threshold > 0)
+  stopifnot(fc_threshold >= 0)
 
   ##organism
   stopifnot(is.character(organism))
