@@ -113,7 +113,8 @@ arrange_anno <- function(anno) {
               "IG_C_pseudogene", "TR_J_pseudogene", "TR_V_pseudogene",
               "rRNA_pseudogene", "retained_intron", "non_stop_decay",
               "nonsense_mediated_decay", "TEC",
-              "protein_coding_CDS_not_defined", "protein_coding_LoF")
+              "protein_coding_CDS_not_defined", "protein_coding_LoF",
+              "artifact")
     stopifnot(all(anno$transcript_type %in% lvls))
 
     dplyr::mutate(anno, transcript_type = factor(transcript_type,
