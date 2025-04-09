@@ -10,12 +10,11 @@
 #'            NA, group_val value must not be NA either. If NA, group_val
 #'            must also be NA. Default: NA
 #'   * group_val: Value in the group column to use in current PCA. If group
-#'                is NA, group_val must also be NA. If group is not NA,
+#'                is NA, group_val must be NA. If group is not NA,
 #'                group_val must be a valid column name from the metadata
 #'                table. Default: NA
-#'   * use_normalisation: "none", "ruvg" or "combat" (txi must be produced in
-#'              consequence). Default: "none"
-#'   * min_counts: Mean values of counts (TPM, ruvg or combat) to keep gene for
+#'   * use_normalisation: "none", "ruvg", "combat", or "clr" . Default: "none"
+#'   * min_counts: Mean values of counts (TPM, ruvg, combat, or clr) to keep genes for
 #'                 PCA. Default: 5
 #'   * id_metadata: Column in metadata table that contains the sample names.
 #'                  Must be present in the colnames of the metadata table.
@@ -25,10 +24,13 @@
 #'            Default: NA
 #'   * color: The column in the metadata file to use to define colors.
 #'             Default: NA
+#'   * color_val: The column in the metadata file to use for manual colors.
+#'                Default: NA
 #'   * title: The title of the PCA. Default: NA
 #'   * legend.position: "left", "right", "top" or "bottom". Default: "right"
 #'   * legend.box: "horizontal" or "vertical". Default: "vertical"
 #'   * show_names: Show sample names on PCA? Default: TRUE
+#'   * show_ellipses: Show ellipses on PCA? Default: FALSE
 #'
 #' Only the id_plot is mandatory. This value is used to name the PCA plots that
 #' are created by the batch_pca function and the output and r_objects filename.
@@ -38,9 +40,8 @@
 #'
 #' @param pca_infos A csv file or a \code{data.frame} describing the PCA to
 #' produce.
-#' @param txi The \code{txi} object returned by the \code{import_kallisto}
-#' function.
-#' @param metatada The metadata to add to the coordinate table to add color or
+#' @param count_matrix The count matrix to use for the PCA analysis.
+#' @param metadata The metadata to add to the coordinate table to add color or
 #' shape with the results and the \code{plot_pca} function. If there is no
 #' metadata available, keep the default value of \code{NULL}. Value can either
 #' be a csv file or a \code{data.frame}. Default: \code{NULL}.
@@ -67,7 +68,7 @@
 #' @importFrom dplyr left_join
 #'
 #' @export
-batch_pca <- function(pca_infos, txi, metadata = NULL, outdir = NULL,
+batch_pca <- function(pca_infos, count_matrix, metadata = NULL, outdir = NULL,
                       r_objects = NULL, force = FALSE, cores = 1) {
     # 1. Data validation
     ## pca_infos
@@ -82,8 +83,10 @@ batch_pca <- function(pca_infos, txi, metadata = NULL, outdir = NULL,
     stopifnot(nrow(pca_infos) > 0)
     stopifnot(!any(duplicated(pca_infos$id_plot)))
 
-    ## txi
-    validate_txi(txi)
+    ## count_matrix
+    stopifnot(is(count_matrix, "matrix"))
+    stopifnot(nrow(count_matrix) > 0)
+    stopifnot(ncol(count_matrix) > 0)
 
     ## metadata
     if (!is.null(metadata)) {
@@ -120,7 +123,7 @@ batch_pca <- function(pca_infos, txi, metadata = NULL, outdir = NULL,
 
     # Complete PCA infos
     pca_infos <- complete_pca_infos(pca_infos)
-    stopifnot(length(validate_pca_infos(pca_infos, metadata, txi)) == 0)
+    stopifnot(length(validate_pca_infos(pca_infos, metadata, count_matrix)) == 0)
 
     # Produce the pca
     min_pca_infos <- dplyr::select(pca_infos, group, group_val, id_metadata,
@@ -159,7 +162,7 @@ batch_pca <- function(pca_infos, txi, metadata = NULL, outdir = NULL,
         }
         if (is.null(current_pca_df)) {
             cpi <- min_pca_infos[i,,drop=FALSE]
-            current_pca_df <- produce_single_pca_df(cpi, txi, metadata)
+            current_pca_df <- produce_single_pca_df(cpi, count_matrix, metadata)
             if (!is.null(r_objects)) {
                 saveRDS(current_pca_df, current_rds)
             }
@@ -251,6 +254,8 @@ complete_pca_infos <- function(pca_infos) {
         pca_infos$shape <- NA
     if (!"color" %in% colnames(pca_infos))
         pca_infos$color <- NA
+    if (!"color_val" %in% colnames(pca_infos))
+        pca_infos$color_val <- NA
     if (!"title" %in% colnames(pca_infos))
         pca_infos$title <- NA
     if (!"legend.position" %in% colnames(pca_infos))
@@ -259,10 +264,12 @@ complete_pca_infos <- function(pca_infos) {
         pca_infos[["legend.box"]] <- "vertical"
     if (!"show_names" %in% colnames(pca_infos))
         pca_infos[["show_names"]] <- TRUE
+    if (!"show_ellipses" %in% colnames(pca_infos))
+        pca_infos[["show_ellipses"]] <- FALSE
     pca_infos
 }
 
-validate_pca_infos <- function(pca_infos, metadata, txi) {
+validate_pca_infos <- function(pca_infos, metadata, count_matrix) {
     errors <- list()
     for (i in seq_along(pca_infos$id_plot)) {
         current_id  <- pca_infos$id_plot[i]
@@ -294,22 +301,28 @@ validate_pca_infos <- function(pca_infos, metadata, txi) {
         # Normalisations checks
         current_use_normalisation <- pca_infos$use_normalisation[i]
         if (!is(current_use_normalisation, "character")) {
-            msg <- "use_normalisation must be \"none\", \"ruvg\", or \"combat\""
+            msg <- "use_normalisation must be \"none\", \"ruvg\", \"combat\", or \"clr\""
             errors[[current_id]] <- c(errors[[current_id]], msg)
         } else {
-            if (!current_use_normalisation %in% c("none", "ruvg", "combat")) {
-                msg <- "use_normalisation must be \"none\", \"ruvg\", or \"combat\""
+            if (!current_use_normalisation %in% c("none", "ruvg", "combat", "clr")) {
+                msg <- "use_normalisation must be \"none\", \"ruvg\", \"combat\", or \"clr\""
                 errors[[current_id]] <- c(errors[[current_id]], msg)
             } else {
                 if (current_use_normalisation == "ruvg") {
-                    if (!"ruvg_counts" %in% names(txi)) {
-                        msg <- "use_normalisation is ruvg but ruvg_counts is missing from txi"
+                    if (!"ruvg_counts" %in% names(count_matrix)) {
+                        msg <- "use_normalisation is ruvg but ruvg_counts is missing from count_matrix"
                         errors[[current_id]] <- c(errors[[current_id]], msg)
                     }
                 }
                 if (current_use_normalisation == "combat") {
-                    if (!"combat_counts" %in% names(txi)) {
-                        msg <- "use_normalisation is combat but combat_counts is missing from txi"
+                    if (!"combat_counts" %in% names(count_matrix)) {
+                        msg <- "use_normalisation is combat but combat_counts is missing from count_matrix"
+                        errors[[current_id]] <- c(errors[[current_id]], msg)
+                    }
+                }
+                if (current_use_normalisation == "clr") {
+                    if (!"clr_counts" %in% names(count_matrix)) {
+                        msg <- "use_normalisation is clr but clr_counts is missing from count_matrix"
                         errors[[current_id]] <- c(errors[[current_id]], msg)
                     }
                 }
@@ -455,23 +468,20 @@ validate_pca_infos <- function(pca_infos, metadata, txi) {
     errors
 }
 
-produce_single_pca_df <- function(current_pca_info, txi, metadata) {
+produce_single_pca_df <- function(current_pca_info, count_matrix, metadata) {
     cpi <- current_pca_info
 
-    use_normalisation <- cpi$use_normalisation
-
     if (!is.null(metadata)) {
-        id_metadata <- validate_metadata(metadata, cpi$id_metadata, txi)
+        id_metadata <- validate_metadata(metadata, cpi$id_metadata, count_matrix)
         if ("group" %in% colnames(cpi) & !is.na(cpi$group)) {
             i <- metadata[[cpi$group]] == cpi$group_val
             i[is.na(i)] <- FALSE
             current_samples <- metadata[[cpi$id_metadata]][i]
-            txi <- filter_txi(txi, current_samples)
+            count_matrix <- count_matrix[, current_samples, drop=FALSE]
         }
     }
 
-    res_pca <- produce_pca_df(txi = txi,
-                              use_normalisation = use_normalisation,
+    res_pca <- produce_pca_df(count_matrix = count_matrix,
                               min_counts = cpi$min_counts,
                               ncp = 2)
 
@@ -491,6 +501,15 @@ produce_single_pca_batch <- function(current_pca_info, res_pca) {
     if (is.na(color)) {
         color <- NULL
     }
+    color_val <- cpi$color_val
+    manual_colors <- NULL
+    if (!is.na(color_val) && !is.null(color_val)) {
+        pre_manual_colors <- setNames(
+            res_pca$coord[[color_val]],
+            res_pca$coord$group_val
+        )
+        manual_colors <- pre_manual_colors[!duplicated(pre_manual_colors)]
+    }
     title <- cpi$title
     if (is.na(title)) {
         title <- NULL
@@ -503,11 +522,17 @@ produce_single_pca_batch <- function(current_pca_info, res_pca) {
     if (is.na(legend.box)) {
         legend.box <- "vertical"
     }
+    show_ellipses <- cpi[["show_ellipses"]]
+    if (is.na(show_ellipses)) {
+        show_ellipses <- FALSE
+    }
 
     plot_pca(res_pca = res_pca,
              size = cpi$size,
              color = color,
              shape = shape,
+             manual_colors = manual_colors,
+             show_ellipses = show_ellipses,
              title = title,
              graph = FALSE,
              legend.position = legend.position,
