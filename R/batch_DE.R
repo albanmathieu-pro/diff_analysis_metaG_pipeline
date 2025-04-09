@@ -26,7 +26,7 @@
 #'
 #' @param de_infos A csv file or a \code{data.frame} describing the DE analysis
 #' to perform.
-#' @param txi The txi object returned by the import_kallisto function.
+#' @param count_matrix The count matrix to use for the differential analysis.
 #' @param design A csv file of a \code{data.frame} describing the groups for
 #' the comparisons.
 #' @param outdir The directory where to save DE analysis in csv format. If
@@ -44,9 +44,9 @@
 #' @examples
 #' \dontrun{
 #' de_infos <- get_demo_de_infos_file()
-#' txi <- get_demo_txi()
+#' count_matrix <- get_demo_count_matrix()
 #' design <- get_demo_design()
-#' de_list <- batch_de(de_infos, txi, design)
+#' de_list <- batch_de(de_infos, count_matrix, design)
 #' }
 #'
 #' @importFrom readr read_csv
@@ -63,7 +63,7 @@
 #' @importFrom dplyr left_join
 #'
 #' @export
-batch_de <- function(de_infos, txi, design, outdir = NULL, r_objects = NULL,
+batch_de <- function(de_infos, count_matrix, design, outdir = NULL, r_objects = NULL,
                      force = FALSE, cores = 1) {
 
     # 1. Data validation
@@ -80,8 +80,10 @@ batch_de <- function(de_infos, txi, design, outdir = NULL, r_objects = NULL,
     expected_cols <- c("group", "contrast_1", "contrast_2")
     stopifnot(all(expected_cols %in% colnames(de_infos)))
 
-    ## txi
-    validate_txi(txi)
+    ## count_matrix
+    stopifnot(is(count_matrix, "matrix"))
+    stopifnot(nrow(count_matrix) > 0)
+    stopifnot(ncol(count_matrix) > 0)
 
     ## design
     stopifnot(is(design, "data.frame") | is(design, "character"))
@@ -116,7 +118,7 @@ batch_de <- function(de_infos, txi, design, outdir = NULL, r_objects = NULL,
 
     # Complete DE infos
     de_infos <- complete_de_infos(de_infos)
-    stopifnot(length(validate_de_infos(de_infos, design, txi)) == 0)
+    stopifnot(length(validate_de_infos(de_infos, design, count_matrix)) == 0)
 
     # Produce the DE
     res <- list()
@@ -135,7 +137,7 @@ batch_de <- function(de_infos, txi, design, outdir = NULL, r_objects = NULL,
             de <- NULL
         }
         res_de <- produce_single_de_batch(de_infos[i,,drop=FALSE],
-                                          txi, design, dds, de)
+                                          count_matrix, design, dds, de)
         if (!is.null(outdir)) {
             output_csv <- paste0(outdir, "/", current_id, ".csv")
             if (!file.exists(output_csv) | force) {
@@ -194,7 +196,7 @@ complete_de_infos <- function(de_infos) {
     de_infos
 }
 
-validate_de_infos <- function(de_infos, design, txi) {
+validate_de_infos <- function(de_infos, design, count_matrix) {
     errors <- list()
     for (i in seq_along(de_infos$id_de)) {
         current_id  <- de_infos$id_de[i]
@@ -273,16 +275,16 @@ validate_de_infos <- function(de_infos, design, txi) {
     errors
 }
 
-produce_single_de_batch <- function(current_de_info, txi, design, dds, de) {
+produce_single_de_batch <- function(current_de_info, count_matrix, design, dds, de) {
     cdi <- current_de_info
 
     cd <- design[[cdi$group]]
     current_contrasts <- c(cdi$contrast_1, cdi$contrast_2)
     current_samples <- design$sample[cd %in% current_contrasts]
-    txi <- filter_txi(txi, current_samples)
+    count_matrix <- count_matrix[, current_samples, drop=FALSE]
     design <- dplyr::filter(design, sample %in% current_samples) %>%
         tibble::column_to_rownames("sample") %>%
-        .[colnames(txi$counts),,drop=FALSE] %>%
+        .[colnames(count_matrix),,drop=FALSE] %>%
         tibble::rownames_to_column("sample")
 
     if (is.null(dds)) {
@@ -294,22 +296,15 @@ produce_single_de_batch <- function(current_de_info, txi, design, dds, de) {
 
         design <- design[design[[cdi$group]] %in% c(current_contrasts),]
 
-        if (is.na(cdi$count_matrix)) {
-            count_matrix <- NULL
-        } else {
-            count_matrix <- cdi$count_matrix
-        }
-
-        dds <- deseq2_analysis(txi = txi,
-                               design = design,
-                               formula = formula,
-                               filter = cdi$filter,
-                               count_matrix = count_matrix)
+        dds <- DESeq2::DESeqDataSetFromMatrix(countData = count_matrix,
+                                              colData = design,
+                                              design = formula)
+        dds <- DESeq2::DESeq(dds)
     }
 
     if (is.null(de)) {
         contrast <- c(cdi$group, cdi$contrast_1, cdi$contrast_2)
-        de <- format_de_results(dds, txi, contrast)
+        de <- DESeq2::results(dds, contrast = contrast)
     }
 
     list(dds = dds, de = de)

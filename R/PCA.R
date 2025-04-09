@@ -1,96 +1,67 @@
-#' Produce a PCA plot from txi
+#' Produce a PCA plot from count_matrix
 #'
-#' The PCA is produced using the TPM by default (can also be the ruvg counts;
-#' see the \code{ruvg_normalization} param)
+#' The PCA is produced using the count_matrix by default (can also use ruvg, combat, or clr normalization;
+#' see the \code{use_normalisation} param).
 #'
-#' @param txi The \code{txi} object returned by the \code{import_kallisto}
-#' function.
-#' @param graph Produce the graph. \code{TRUE} or \code{FALSE}. Default:
-#' \code{TRUE}.
-#' @param use_normalisation What kind of normalisation should be used instead
-#' of TPM? Can be either "none", "ruvg" or "combat". Default: "none"
-#' @param min_counts The minimal mean number of count (TPM by default; see also
-#' the \code{ruvg_normalization} param) required to keep the feature (gene or
-#' transcript) for the PCA.
-#' @param metatada The metadata to add to the coordinate table to add color or
-#' shape with the results and the \code{plot_pca} function. If there is no
-#' metadata available, keep the default value of \code{NULL}. Value can either
-#' be a csv file or a \code{data.frame}. Default: \code{NULL}.
-#' @param id_metadata The colname to use to join the metadata with the
-#' coordinate table. Must contains all the sample names found in the txi. If
-#' \code{NULL} and a metadata table is provided, the first column will be used
-#' to join the tables. Default: \code{NULL}.
-#' @param ncp Number of component to include in the graph. Default: 2.
+#' @param count_matrix A matrix of counts where rows are features (e.g., genes) and columns are samples.
+#' @param use_normalisation What kind of normalisation should be used? Can be either "none", "ruvg", "combat", or "clr". Default: "none".
+#' @param min_counts The minimal mean number of counts required to keep the feature for the PCA.
+#' @param metadata The metadata to add to the coordinate table to add color or shape with the results and the \code{plot_pca} function.
+#' If there is no metadata available, keep the default value of \code{NULL}. Value can either be a csv file or a \code{data.frame}. Default: \code{NULL}.
+#' @param id_metadata The colname to use to join the metadata with the coordinate table. Must contain all the sample names found in the count_matrix.
+#' If \code{NULL} and a metadata table is provided, the first column will be used to join the tables. Default: \code{NULL}.
+#' @param ncp Number of components to include in the graph. Default: 2.
 #'
-#' @return Produce the PCA and silently returns a \code{list} with the
-#' coordinates and the x and y labels.
+#' @return Produce the PCA and silently returns a \code{list} with the coordinates and the x and y labels.
 #'
 #' @examples
-#' txi <- get_demo_txi()
-#' res_pca <- produce_pca_df(txi)
-#'
-#' @importFrom magrittr %>%
-#' @importFrom FactoMineR PCA
-#' @importFrom dplyr mutate
-#' @importFrom dplyr group_by
-#' @importFrom dplyr summarize
-#' @importFrom dplyr filter
-#' @importFrom dplyr pull
-#' @importFrom tidyr gather
-#' @importFrom tidyr spread
-#' @importFrom stringr str_extract
-#' @importFrom utils tail
+#' count_matrix <- matrix(runif(100), nrow = 10, ncol = 10)
+#' colnames(count_matrix) <- paste0("Sample", 1:10)
+#' rownames(count_matrix) <- paste0("Gene", 1:10)
+#' res_pca <- produce_pca_df(count_matrix)
 #'
 #' @export
-
-produce_pca_df <- function(txi, use_normalisation = "none", min_counts = 5,
+produce_pca_df <- function(count_matrix, use_normalisation = "none", min_counts = 5,
                            metadata = NULL, id_metadata = NULL, ncp = 2) {
 
-    validate_txi(txi)
-    stopifnot(use_normalisation %in% c("none", "ruvg", "combat"))
-    id_metadata <- validate_metadata(metadata, id_metadata, txi)
+    stopifnot(is(count_matrix, "matrix"))
+    stopifnot(use_normalisation %in% c("none", "ruvg", "combat", "clr"))
     stopifnot(is(ncp, "numeric"))
     stopifnot(identical(ncp, round(ncp)))
     stopifnot(ncp > 1)
 
-    if (use_normalisation == "none") {
-        tpm <- as.data.frame(txi$abundance)
-    } else if (use_normalisation == "ruvg") {
-        stopifnot("ruvg_counts" %in% names(txi))
-        stopifnot(is(txi$ruvg_counts, "matrix"))
-        tpm <- as.data.frame(txi$ruvg_counts)
-    } else if (use_normalisation == "combat") {
-        stopifnot("combat_counts" %in% names(txi))
-        stopifnot(is(txi$combat_counts, "matrix"))
-        tpm <- as.data.frame(txi$combat_counts)
+    if (!is.null(metadata)) {
+        id_metadata <- validate_metadata(metadata, id_metadata, count_matrix)
     }
 
-    if (!is.null(txi$dummy)) {
-        stopifnot(is(txi$dummy, "character"))
-        if (use_normalisation == "none") {
-            stopifnot("abundance" %in% txi$dummy)
-        } else if (use_normalisation == "ruvg") {
-            stopifnot("ruvg_counts" %in% txi$dummy)
-        } else if (use_normalisation == "combat") {
-            stopifnot("combat_counts" %in% txi$dummy)
-        }
+    if (use_normalisation == "none") {
+        tpm <- as.data.frame(count_matrix)
+    } else if (use_normalisation == "ruvg") {
+        stopifnot("ruvg_counts" %in% names(attributes(count_matrix)))
+        tpm <- as.data.frame(attr(count_matrix, "ruvg_counts"))
+    } else if (use_normalisation == "combat") {
+        stopifnot("combat_counts" %in% names(attributes(count_matrix)))
+        tpm <- as.data.frame(attr(count_matrix, "combat_counts"))
+    } else if (use_normalisation == "clr") {
+        stopifnot("clr" %in% names(attributes(count_matrix)))
+        tpm <- as.data.frame(attr(count_matrix, "clr"))
     }
 
     tpm <- tpm %>%
-            dplyr::mutate(ensembl_gene = rownames(tpm)) %>%
-            tidyr::gather(sample, tpm, -ensembl_gene)
+             dplyr::mutate(feature_s = rownames(tpm)) %>%
+             tidyr::gather(sample, tpm, -feature_s)
 
-    min_tpm <- dplyr::group_by(tpm, ensembl_gene) %>%
+    min_tpm <- dplyr::group_by(tpm, feature_s) %>%
         dplyr::summarize(tpm = sum(tpm)) %>%
         dplyr::filter(tpm >= min_counts) %>%
-        dplyr::pull(ensembl_gene)
+        dplyr::pull(feature_s)
 
-    tpm_filter <- dplyr::filter(tpm, ensembl_gene %in% min_tpm)
+    tpm_filter <- dplyr::filter(tpm, feature_s %in% min_tpm)
 
     df <- tidyr::spread(tpm_filter, sample, tpm) %>%
         as.data.frame
-    rownames(df) <- df$ensembl_gene
-    m <- dplyr::select(df, -ensembl_gene) %>%
+    rownames(df) <- df$feature_s
+    m <- dplyr::select(df, -feature_s) %>%
         as.matrix %>%
         t
 
@@ -110,7 +81,7 @@ produce_pca_df <- function(txi, use_normalisation = "none", min_counts = 5,
         if (is.null(id_metadata)) {
             id_metadata <- colnames(metadata)[1]
         }
-        df <- left_join(df, metadata, by = c("sample" = id_metadata))
+        df <- dplyr::left_join(df, metadata, by = c("sample" = id_metadata))
     }
 
     xlab <- paste0("Dim1 (", pca$eig[1,2] %>% round(2), "%)")
@@ -119,7 +90,7 @@ produce_pca_df <- function(txi, use_normalisation = "none", min_counts = 5,
     list(coord = df, xlab = xlab, ylab = ylab)
 }
 
-validate_metadata <- function(metadata, id_metadata, txi) {
+validate_metadata <- function(metadata, id_metadata, count_matrix) {
     if (!is.null(metadata)) {
         stopifnot(is(metadata, "data.frame") | is(metadata, "character"))
         if (is.character(metadata)) {
@@ -131,7 +102,7 @@ validate_metadata <- function(metadata, id_metadata, txi) {
         }
         stopifnot(is(id_metadata, "character"))
         stopifnot(id_metadata %in% colnames(metadata))
-        stopifnot(all(colnames(txi$abundance) %in% metadata[[id_metadata]]))
+        stopifnot(all(colnames(count_matrix) %in% metadata[[id_metadata]]))
     }
     id_metadata
 }
@@ -148,6 +119,7 @@ validate_metadata <- function(metadata, id_metadata, txi) {
 #' @param show_names Try to add the labels of each point? Will only add the
 #' labels if the points are not too closely clustered together in the PCA.
 #' Default: \code{TRUE}.
+#' @param show_ellipses Add ellipses around groups? Default: \code{FALSE}.
 #' @param title Add a title to the graph? If \code{NULL}, no title is added to
 #' the graph. Otherwise this param must be a \code{character}. Default:
 #' \code{NULL}.
@@ -157,6 +129,7 @@ validate_metadata <- function(metadata, id_metadata, txi) {
 #' ggplot2. Default: "right".
 #' @param legend.box Value for the \code{legend.box} param from ggplot2.
 #' Default: "vertical".
+#' @param manual_colors A named vector of colors to manually set group colors. Default: \code{NULL}.
 #'
 #' @return Returns the \code{ggplot} object
 #'
@@ -172,14 +145,18 @@ validate_metadata <- function(metadata, id_metadata, txi) {
 #' @importFrom ggplot2 theme_bw
 #' @importFrom ggplot2 labs
 #' @importFrom ggplot2 scale_shape_manual
+#' @importFrom ggplot2 scale_color_manual
 #' @importFrom ggplot2 ggtitle
 #' @importFrom ggrepel geom_text_repel
+#' @importFrom ggnewscale new_scale_colour
+#' @importFrom ggplot2 stat_ellipse
 #'
 #' @export
 plot_pca <- function(res_pca, size = 3, color = NULL, shape = NULL,
-                     show_names = TRUE, title = NULL, graph = TRUE,
+                     show_names = TRUE, show_ellipses = FALSE, title = NULL, graph = TRUE,
                      legend.position = "right",
-                     legend.box = "vertical") {
+                     legend.box = "vertical",
+                     manual_colors = NULL) {
 
     # Validate the params
     stopifnot(is(res_pca, "list"))
@@ -204,6 +181,7 @@ plot_pca <- function(res_pca, size = 3, color = NULL, shape = NULL,
         stopifnot(shape %in% colnames(res_pca$coord))
     }
     stopifnot(is(show_names, "logical"))
+    stopifnot(is(show_ellipses, "logical"))
     if (!is.null(title)) {
         stopifnot(is(title, "character"))
     }
@@ -237,6 +215,20 @@ plot_pca <- function(res_pca, size = 3, color = NULL, shape = NULL,
         gg <- gg + ggplot2::geom_point(size = size)
     }
 
+    # Apply manual colors if provided
+    if (!is.null(manual_colors) & !is.null(color)) {
+        gg <- gg + ggplot2::scale_color_manual(values = manual_colors)
+    }
+
+    # Add ellipses if show_ellipses is TRUE
+    if (show_ellipses) {
+        gg <- gg +
+            ggplot2::stat_ellipse(ggplot2::aes(color = group_val,fill = group_val), 
+                                  geom = "polygon", alpha = 0.1 ) +
+            ggplot2::scale_color_manual(values = manual_colors)+
+            ggplot2::scale_fill_manual(values = manual_colors)
+    }
+
     # legend
     if (!is.null(color) | !is.null(shape)) {
         gg <- gg + ggplot2::theme(legend.position = legend.position,
@@ -244,7 +236,7 @@ plot_pca <- function(res_pca, size = 3, color = NULL, shape = NULL,
     }
 
     # show_names
-    if(show_names){
+    if (show_names) {
         gg <- gg + ggrepel::geom_text_repel(ggplot2::aes(label = sample),
                                             color = "black", force = 10)
     }

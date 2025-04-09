@@ -79,9 +79,11 @@ produce_volcano <- function(de_res, fc_threshold = 3, p_threshold = 0.05,
     stopifnot(is(y_axis, "character"))
     stopifnot(y_axis %in% c("pvalue", "padj"))
 
-    if (is(de_res, "DESeqResults")) {
-        de_res <- as.data.frame(de_res)
-    }
+    # if (is(de_res, "DESeqResults")) {
+    nom = paste0(names(de_res), ".")
+    de_res <- as.data.frame(de_res)
+    colnames(de_res) = str_remove(colnames(de_res), nom)
+    # }
 
     # Rename qV to padj
     i <- stringr::str_detect(colnames(de_res), "qV")

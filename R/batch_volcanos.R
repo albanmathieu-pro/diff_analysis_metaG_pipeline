@@ -38,6 +38,9 @@
 #' @param force Should the files be re-created if they already exists? Default:
 #' \code{FALSE}.
 #' @param cores Number of cores for the volcano creation. Default: 1
+#' @param count_matrix The count matrix to use for the differential analysis.
+#' @param design A csv file of a \code{data.frame} describing the groups for
+#' the comparisons.
 #'
 #' @return Invisibly returns a \code{list} of all the volcano plots.
 #'
@@ -66,7 +69,7 @@
 #' @export
 batch_volcano <- function(volcano_infos, de_results, add_labels = NULL,
                           outdir = NULL, r_objects = NULL, force = FALSE,
-                          cores = 1) {
+                          cores = 1, count_matrix = NULL, design = NULL) {
 
     # 1. Data validation
     ## volcano_infos
